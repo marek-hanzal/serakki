@@ -15,6 +15,7 @@ import type { QuerySchema } from "~/item-query/schema/QuerySchema";
 import type { RuleSchema as ActionRuleSchema } from "~/production-action/schema/RuleSchema";
 import type { WhenSchema } from "~/production-condition/schema/WhenSchema";
 import type { RuleSchema as LineRuleSchema } from "~/production-line/schema/RuleSchema";
+import type { RuleTypeSchema } from "~/production-line/schema/RuleTypeSchema";
 import { DraftDefaults } from "~/production-authoring/ui/DraftDefaults";
 import { BoardDistanceControl } from "~/production-authoring/ui/BoardDistanceControl";
 import { SelectorControl } from "~/production-authoring/ui/SelectorControl";
@@ -35,6 +36,7 @@ import {
 import { readEditorFormValidationErrorFn } from "~/editor-control/fn/readEditorFormValidationErrorFn";
 import { readRequiredEditorCollectionErrorFn } from "~/editor-control/fn/readRequiredEditorCollectionErrorFn";
 import { useTranslator } from "~/translation/ui/useTranslator";
+import type { createTranslatorFn } from "~/translation/fn/createTranslatorFn";
 import type { ReactNode } from "react";
 import type { ActionMenuOption } from "~/ui/ui/ActionMenu";
 import { QuantityFields } from "~/production-authoring/ui/QuantityControl";
@@ -44,7 +46,6 @@ import { useEditorProject } from "~/authoring-session/ui/useEditorProject";
 import { useEditorItemOptionLabel } from "~/authoring-form/ui/useEditorItemSearchOptions";
 
 type RuleValue = ActionRuleSchema.Type | LineRuleSchema.Type | OutcomeRuleSchema.Type;
-type RuleType = LineRuleSchema.Type["type"];
 type RuleTarget = "action" | "set" | "outcome" | "line";
 type DraftWhen =
 	| WhenSchema.Type
@@ -65,6 +66,67 @@ type DraftRule =
 			readonly when: DraftWhen[];
 	  };
 
+const createRuleFn = (type: RuleTypeSchema.Type): DraftRule =>
+	match(type)
+		.returnType<DraftRule>()
+		.with("enable", "disable", "show", "hide", (type) => ({
+			type,
+			when: [],
+		}))
+		.with("runtime:adjust", (type) => ({
+			type,
+			when: [],
+			adjustMs: 0,
+		}))
+		.with("runtime:multiplier", (type) => ({
+			type,
+			when: [],
+			multiplier: 1,
+		}))
+		.exhaustive();
+
+const readConditionAddOptionsFn = (
+	translator: createTranslatorFn.Translator,
+	onSelectFn: (when: WhenSchema.Type) => void,
+): readonly ActionMenuOption[] => [
+	{
+		id: "exists",
+		label: translator.textFn("Exists"),
+		description: translator.textFn("Match when the selected item exists in the search area."),
+		icon: <SearchCheck className="size-5" />,
+		onSelectFn: () =>
+			onSelectFn({
+				type: "exists",
+				query: structuredClone(DraftDefaults.conditionQuery),
+			}),
+	},
+	{
+		id: "count",
+		label: translator.textFn("Exact count"),
+		description: translator.textFn("Match an exact number of selected items."),
+		icon: <Hash className="size-5" />,
+		onSelectFn: () =>
+			onSelectFn({
+				type: "count",
+				query: structuredClone(DraftDefaults.conditionQuery),
+				count: 1,
+			}),
+	},
+	{
+		id: "range",
+		label: translator.textFn("Count range"),
+		description: translator.textFn("Match a range of selected item counts."),
+		icon: <MoveHorizontal className="size-5" />,
+		onSelectFn: () =>
+			onSelectFn({
+				type: "range",
+				query: structuredClone(DraftDefaults.conditionQuery),
+				min: 1,
+				max: 1,
+			}),
+	},
+];
+
 const RuleTypeIcon = {
 	enable: <CircleCheck className="size-4 shrink-0" />,
 	disable: <CircleOff className="size-4 shrink-0" />,
@@ -72,7 +134,7 @@ const RuleTypeIcon = {
 	hide: <EyeOff className="size-4 shrink-0" />,
 	"runtime:adjust": <Timer className="size-4 shrink-0" />,
 	"runtime:multiplier": <Gauge className="size-4 shrink-0" />,
-} satisfies Record<RuleType, ReactNode>;
+} satisfies Record<RuleTypeSchema.Type, ReactNode>;
 
 const RuleTypeTranslationKey = {
 	disable: "Disable",
@@ -81,7 +143,7 @@ const RuleTypeTranslationKey = {
 	"runtime:adjust": "Runtime adjustment",
 	"runtime:multiplier": "Runtime multiplier",
 	show: "Show",
-} as const satisfies Record<RuleType, string>;
+} as const satisfies Record<RuleTypeSchema.Type, string>;
 
 const RuleTypeDescriptionKey = {
 	disable: "Disable this when its conditions match.",
@@ -90,7 +152,7 @@ const RuleTypeDescriptionKey = {
 	"runtime:adjust": "Adjust this production line's running time.",
 	"runtime:multiplier": "Multiply this production line's running time.",
 	show: "Show this production line when its conditions match.",
-} as const satisfies Record<RuleType, string>;
+} as const satisfies Record<RuleTypeSchema.Type, string>;
 
 const readConditionItemUidFn = (when: DraftWhen): string => when.query.selector.itemUid;
 
@@ -393,61 +455,15 @@ const RuleControl = ({
 									];
 						}}
 						label={`${translator.textFn("Rule")} ${ruleIndex + 1} ${translator.textFn("conditions")}`}
-						addOptions={(
-							[
-								{
-									type: "exists",
-									label: "Exists",
-									description:
-										"Match when the selected item exists in the search area.",
-									icon: <SearchCheck className="size-5" />,
-								},
-								{
-									type: "count",
-									label: "Exact count",
-									description: "Match an exact number of selected items.",
-									icon: <Hash className="size-5" />,
-								},
-								{
-									type: "range",
-									label: "Count range",
-									description: "Match a range of selected item counts.",
-									icon: <MoveHorizontal className="size-5" />,
-								},
-							] as const
-						).map(({ type, label, description, icon }) => ({
-							id: type,
-							label: translator.textFn(label),
-							description: translator.textFn(description),
-							icon,
-							onSelectFn: () => {
-								const query = structuredClone(DraftDefaults.conditionQuery);
-								const when: WhenSchema.Type = match(type)
-									.with("exists", () => ({
-										type: "exists" as const,
-										query,
-									}))
-									.with("count", () => ({
-										type: "count" as const,
-										query,
-										count: 1,
-									}))
-									.with("range", () => ({
-										type: "range" as const,
-										query,
-										min: 1,
-										max: 1,
-									}))
-									.exhaustive();
-								onChangeFn({
-									...rule,
-									when: [
-										...rule.when,
-										when,
-									],
-								});
-							},
-						}))}
+						addOptions={readConditionAddOptionsFn(translator, (when) =>
+							onChangeFn({
+								...rule,
+								when: [
+									...rule.when,
+									when,
+								],
+							}),
+						)}
 						onRemoveFn={(whenIndex) =>
 							onChangeFn({
 								...rule,
@@ -497,7 +513,7 @@ export const RulesControl = ({
 	rules,
 	target,
 }: {
-	readonly allowedTypes: ReadonlyArray<RuleType>;
+	readonly allowedTypes: ReadonlyArray<RuleTypeSchema.Type>;
 	readonly description: ReactNode;
 	readonly headerVisible?: boolean;
 	readonly label?: string;
@@ -512,19 +528,6 @@ export const RulesControl = ({
 	const readItemLabelFn = useEditorItemOptionLabel();
 	const translator = useTranslator();
 	const collectionLabel = label ?? translator.textFn("Rules");
-	const createRuleFn = (type: RuleType): DraftRule =>
-		({
-			type,
-			when: [],
-			...match(type)
-				.with("runtime:multiplier", () => ({
-					multiplier: 1,
-				}))
-				.with("runtime:adjust", () => ({
-					adjustMs: 0,
-				}))
-				.otherwise(() => ({})),
-		}) as DraftRule;
 	const emitChangeFn = (next: ReadonlyArray<DraftRule>) => onChangeFn(next as RuleValue[]);
 	return (
 		<section className="grid gap-3">
@@ -544,7 +547,9 @@ export const RulesControl = ({
 					draftRules[ruleIndex].type === undefined
 						? `${translator.textFn("Rule")} ${ruleIndex + 1}`
 						: `${translator.textFn("Rule")} ${ruleIndex + 1} — ${translator.textFn(
-								RuleTypeTranslationKey[draftRules[ruleIndex].type as RuleType],
+								RuleTypeTranslationKey[
+									draftRules[ruleIndex].type as RuleTypeSchema.Type
+								],
 							)}`
 				}
 				itemSearchTermsFn={(ruleIndex) =>

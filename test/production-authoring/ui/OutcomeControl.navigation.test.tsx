@@ -62,6 +62,7 @@ vi.mock("~/editor-control/ui/EditorSearchCombobox", () => ({
 
 import { OutcomeControl } from "~/production-authoring/ui/OutcomeControl";
 import { RollSetControl } from "~/production-authoring/ui/RollSetControl";
+import { DraftDefaults } from "~/production-authoring/ui/DraftDefaults";
 
 (
 	globalThis as {
@@ -82,7 +83,7 @@ const changeInput = async (input: HTMLInputElement, value: string) => {
 	});
 };
 
-it("adds each outcome destination and drop placement without replacing existing outcomes", async () => {
+it("adds independent outcome drafts without replacing existing outcomes", async () => {
 	const initial = OutcomeTableSchema.parse({
 		set: [
 			{
@@ -194,6 +195,14 @@ it("adds each outcome destination and drop placement without replacing existing 
 				rules: [],
 			},
 		]);
+		const local = current.set[0].roll[0].outcome[5];
+		const random = current.set[0].roll[0].outcome[6];
+		if (local.type !== "item" || random.type !== "item")
+			throw new Error("Expected item drafts from both drop options.");
+		expect(local.quantity).not.toBe(random.quantity);
+		expect(local.rules).not.toBe(random.rules);
+		expect(local.quantity).not.toBe(DraftDefaults.itemOutcome.quantity);
+		expect(random.quantity).not.toBe(DraftDefaults.itemOutcome.quantity);
 	} finally {
 		await act(async () => root.unmount());
 		container.remove();
@@ -463,7 +472,7 @@ it("focuses and edits a set rule without changing the selected set's drops", asy
 	}
 });
 
-it("adds selected roll kinds with their own defaults", async () => {
+it("adds independent roll drafts without sharing outcome arrays", async () => {
 	const initial = OutcomeTableSchema.parse({
 		set: [
 			{
@@ -509,6 +518,7 @@ it("adds selected roll kinds with their own defaults", async () => {
 		for (const id of [
 			"chance",
 			"guaranteed",
+			"chance",
 		]) {
 			await renderFn(current);
 			const add = container.querySelector<HTMLButtonElement>(
@@ -534,6 +544,12 @@ it("adds selected roll kinds with their own defaults", async () => {
 			type: "guaranteed",
 			outcome: [],
 		});
+		expect(current.roll[3]).toEqual(current.roll[1]);
+		expect(current.roll[3]).not.toBe(current.roll[1]);
+		expect(current.roll[3].outcome).not.toBe(current.roll[1].outcome);
+		expect(current.roll[1].outcome).not.toBe(current.roll[2].outcome);
+		expect(current.roll[1].outcome).not.toBe(DraftDefaults.rolls.chance.outcome);
+		expect(current.roll[2].outcome).not.toBe(DraftDefaults.rolls.guaranteed.outcome);
 	} finally {
 		await act(async () => root.unmount());
 		container.remove();

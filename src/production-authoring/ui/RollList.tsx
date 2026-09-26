@@ -29,21 +29,21 @@ const RollTypeLabelByType = {
 
 const readRollAddOptionsFn = (
 	translator: createTranslatorFn.Translator,
-	onSelectFn: (type: RollSchema.Type["type"]) => void,
+	onSelectFn: (roll: RollSchema.Type) => void,
 ): readonly ActionMenuOption[] => [
 	{
 		id: "guaranteed",
 		label: translator.textFn("Guaranteed"),
 		description: translator.textFn("Always produce this roll's outcomes."),
 		icon: <CircleCheck className="size-5" />,
-		onSelectFn: () => onSelectFn("guaranteed"),
+		onSelectFn: () => onSelectFn(structuredClone(DraftDefaults.rolls.guaranteed)),
 	},
 	{
 		id: "chance",
 		label: translator.textFn("Chance"),
 		description: translator.textFn("Produce this roll's outcomes with a chosen chance."),
 		icon: <Dice5 className="size-5" />,
-		onSelectFn: () => onSelectFn("chance"),
+		onSelectFn: () => onSelectFn(structuredClone(DraftDefaults.rolls.chance)),
 	},
 ];
 
@@ -82,10 +82,10 @@ export const RollList = ({
 			...value,
 			roll: editEditorCollectionFn(value.roll, edit) as RollSetSchema.Type["roll"],
 		});
-	const addOptions = readRollAddOptionsFn(translator, (type) =>
+	const addOptions = readRollAddOptionsFn(translator, (roll) =>
 		onEditFn({
 			type: "append",
-			value: structuredClone(DraftDefaults.rolls[type]),
+			value: roll,
 		}),
 	);
 	return (

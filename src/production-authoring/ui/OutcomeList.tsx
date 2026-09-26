@@ -1,5 +1,3 @@
-import { match } from "ts-pattern";
-
 import { editEditorCollectionFn } from "~/editor-control/fn/editEditorCollectionFn";
 import type { createTranslatorFn } from "~/translation/fn/createTranslatorFn";
 import { DoorOpen, History, MapPin, PanelsTopLeft, Shuffle, Sparkles } from "lucide-react";
@@ -23,74 +21,40 @@ import { Mx } from "~/translation/ui/Mx";
 import type { ActionMenuOption } from "~/ui/ui/ActionMenu";
 import { useTranslator } from "~/translation/ui/useTranslator";
 
-type OutcomeDraftKind =
-	| "drop-local"
-	| "drop-random"
-	| "space"
-	| "space-previous"
-	| "space-inventory"
-	| "template";
-
-const createOutcomeDraftFn = (
-	kind: OutcomeDraftKind,
-	inventoryTemplateUid: string | undefined,
-): OutcomeSchema.Type =>
-	match(kind)
-		.returnType<OutcomeSchema.Type>()
-		.with("drop-local", () => structuredClone(DraftDefaults.itemOutcome))
-		.with("drop-random", () => ({
-			...structuredClone(DraftDefaults.itemOutcome),
-			placement: "random",
-		}))
-		.with("space", () => ({
-			type: "space",
-			space: 0,
-			rules: [],
-		}))
-		.with("space-previous", () => ({
-			type: "space",
-			space: "previous",
-			rules: [],
-		}))
-		.with("space-inventory", () => ({
-			type: "space",
-			space: {
-				type: "inventory",
-				templateUid: inventoryTemplateUid ?? "",
-			},
-			rules: [],
-		}))
-		.with("template", () => ({
-			type: "template",
-			templateUid: "",
-			rules: [],
-		}))
-		.exhaustive();
-
 const readOutcomeAddOptionsFn = (
 	translator: createTranslatorFn.Translator,
-	onSelectFn: (kind: OutcomeDraftKind) => void,
+	inventoryTemplateUid: string | undefined,
+	onSelectFn: (outcome: OutcomeSchema.Type) => void,
 ): readonly ActionMenuOption[] => [
 	{
 		id: "drop-local",
 		label: translator.textFn("Drop - Local"),
 		description: translator.textFn("Place items in nearby empty cells beside the producer."),
 		icon: <MapPin className="size-5" />,
-		onSelectFn: () => onSelectFn("drop-local"),
+		onSelectFn: () => onSelectFn(structuredClone(DraftDefaults.itemOutcome)),
 	},
 	{
 		id: "drop-random",
 		label: translator.textFn("Drop - Random"),
 		description: translator.textFn("Place items near random cells on the current Board."),
 		icon: <Shuffle className="size-5" />,
-		onSelectFn: () => onSelectFn("drop-random"),
+		onSelectFn: () =>
+			onSelectFn({
+				...structuredClone(DraftDefaults.itemOutcome),
+				placement: "random",
+			}),
 	},
 	{
 		id: "space",
 		label: translator.textFn("Space"),
 		description: translator.textFn("Move to an exact space number."),
 		icon: <DoorOpen className="size-5" />,
-		onSelectFn: () => onSelectFn("space"),
+		onSelectFn: () =>
+			onSelectFn({
+				type: "space",
+				space: 0,
+				rules: [],
+			}),
 	},
 	{
 		id: "space-previous",
@@ -99,7 +63,12 @@ const readOutcomeAddOptionsFn = (
 			"Return to the last space left. Without history, this outcome does nothing.",
 		),
 		icon: <History className="size-5" />,
-		onSelectFn: () => onSelectFn("space-previous"),
+		onSelectFn: () =>
+			onSelectFn({
+				type: "space",
+				space: "previous",
+				rules: [],
+			}),
 	},
 	{
 		id: "space-inventory",
@@ -108,7 +77,15 @@ const readOutcomeAddOptionsFn = (
 			"Open this item's Inventory, an item-owned Space initialized from a template on first use.",
 		),
 		icon: <Sparkles className="size-5" />,
-		onSelectFn: () => onSelectFn("space-inventory"),
+		onSelectFn: () =>
+			onSelectFn({
+				type: "space",
+				space: {
+					type: "inventory",
+					templateUid: inventoryTemplateUid ?? "",
+				},
+				rules: [],
+			}),
 	},
 	{
 		id: "template",
@@ -117,7 +94,12 @@ const readOutcomeAddOptionsFn = (
 			"Replaces the outcome origin space with this template, or an explicit target space when configured.",
 		),
 		icon: <PanelsTopLeft className="size-5" />,
-		onSelectFn: () => onSelectFn("template"),
+		onSelectFn: () =>
+			onSelectFn({
+				type: "template",
+				templateUid: "",
+				rules: [],
+			}),
 	},
 ];
 
@@ -150,11 +132,14 @@ export const OutcomeList = ({
 	);
 	const onEditFn = (edit: editEditorCollectionFn.Edit<OutcomeSchema.Type>) =>
 		onChangeFn(editEditorCollectionFn(value, edit));
-	const addOptions = readOutcomeAddOptionsFn(translator, (kind) =>
-		onEditFn({
-			type: "append",
-			value: createOutcomeDraftFn(kind, project.config.templates?.[0]?.uid),
-		}),
+	const addOptions = readOutcomeAddOptionsFn(
+		translator,
+		project.config.templates?.[0]?.uid,
+		(outcome) =>
+			onEditFn({
+				type: "append",
+				value: outcome,
+			}),
 	);
 	return (
 		<section className="grid gap-3">

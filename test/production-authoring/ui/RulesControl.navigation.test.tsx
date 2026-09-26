@@ -32,6 +32,7 @@ vi.mock("~/production-authoring/ui/SelectorControl", () => ({
 }));
 
 import { RulesControl } from "~/production-authoring/ui/RulesControl";
+import { DraftDefaults } from "~/production-authoring/ui/DraftDefaults";
 
 (
 	globalThis as {
@@ -113,6 +114,25 @@ it("creates only allowed rule kinds and typed conditions from the collection men
 				],
 			},
 		]);
+		const withCount = onChangeFn.mock.lastCall?.[0] as RuleSchema.Type[];
+		await renderFn(withCount);
+		await act(async () =>
+			container
+				.querySelector<HTMLButtonElement>(
+					'[data-ui="EditorConditionsCollection"] [data-ui="EditorCollectionAdd"]',
+				)
+				?.click(),
+		);
+		await selectOptionFn("range");
+		const withRange = onChangeFn.mock.lastCall?.[0] as RuleSchema.Type[];
+		expect(withRange[0].when).toHaveLength(2);
+		expect(withRange[0].when[0]).toBe(withCount[0].when[0]);
+		const firstQuery = withRange[0].when[0].query;
+		const secondQuery = withRange[0].when[1].query;
+		expect(firstQuery).not.toBe(secondQuery);
+		expect(firstQuery.selector).not.toBe(secondQuery.selector);
+		expect(firstQuery.selector).not.toBe(DraftDefaults.conditionQuery.selector);
+		expect(secondQuery.selector).not.toBe(DraftDefaults.conditionQuery.selector);
 	} finally {
 		await act(async () => root.unmount());
 		container.remove();

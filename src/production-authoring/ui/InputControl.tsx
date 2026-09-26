@@ -1,5 +1,7 @@
 import { useTranslator } from "~/translation/ui/useTranslator";
 import type { InputSchema as LineInputSchema } from "~/production-input/schema/InputSchema";
+import type { MaterialSchema } from "~/production-input/schema/MaterialSchema";
+import type { UnitsSchema } from "~/production-input/schema/UnitsSchema";
 import { match, P } from "ts-pattern";
 import { DraftDefaults } from "~/production-authoring/ui/DraftDefaults";
 import { QuantityFields } from "~/production-authoring/ui/QuantityControl";
@@ -13,20 +15,6 @@ import type { EditorFormValidationIssue } from "~/editor-control/type/EditorForm
 import { readEditorFormValidationErrorFn } from "~/editor-control/fn/readEditorFormValidationErrorFn";
 import { Mx } from "~/translation/ui/Mx";
 
-type UnitsInput = Extract<
-	LineInputSchema.Type,
-	{
-		readonly type: "units";
-	}
->;
-
-type MaterialInput = Extract<
-	LineInputSchema.Type,
-	{
-		readonly type: "materials";
-	}
->;
-
 const hasUnitsFn = (item: ItemSchema.Type) => item.units !== undefined;
 
 const UnitsSelfUnitCostControl = ({
@@ -35,8 +23,8 @@ const UnitsSelfUnitCostControl = ({
 	onChangeFn,
 }: {
 	readonly error?: string;
-	readonly input: UnitsInput;
-	readonly onChangeFn: (input: UnitsInput) => void;
+	readonly input: UnitsSchema.Type;
+	readonly onChangeFn: (input: UnitsSchema.Type) => void;
 }) => {
 	const translator = useTranslator();
 	const units = input.units ?? DraftDefaults.inputs.units.units;
@@ -70,9 +58,9 @@ const MaterialInputControl = ({
 	issues,
 	onChangeFn,
 }: {
-	readonly input: MaterialInput;
+	readonly input: MaterialSchema.Type;
 	readonly issues: ReadonlyArray<EditorFormValidationIssue>;
-	readonly onChangeFn: (input: MaterialInput) => void;
+	readonly onChangeFn: (input: MaterialSchema.Type) => void;
 }) => {
 	const translator = useTranslator();
 	return (
@@ -130,9 +118,9 @@ const UnitsTargetUnitCostControl = ({
 	issues,
 	onChangeFn,
 }: {
-	readonly input: UnitsInput;
+	readonly input: UnitsSchema.Type;
 	readonly issues: ReadonlyArray<EditorFormValidationIssue>;
-	readonly onChangeFn: (input: UnitsInput) => void;
+	readonly onChangeFn: (input: UnitsSchema.Type) => void;
 }) => {
 	const project = useEditorProject();
 	const translator = useTranslator();
