@@ -1,3 +1,5 @@
+import { editEditorCollectionFn } from "~/editor-control/fn/editEditorCollectionFn";
+import type { createTranslatorFn } from "~/translation/fn/createTranslatorFn";
 import { DoorOpen, History, MapPin, PanelsTopLeft, Shuffle, Sparkles } from "lucide-react";
 
 import { useEditorItemOptionLabel } from "~/authoring-form/ui/useEditorItemSearchOptions";
@@ -19,7 +21,6 @@ import { Mx } from "~/translation/ui/Mx";
 import type { ActionMenuOption } from "~/ui/ui/ActionMenu";
 import { useTranslator } from "~/translation/ui/useTranslator";
 
-type OutcomeListValue = OutcomeSchema.Type[];
 type OutcomeDraftKind =
 	| "drop-local"
 	| "drop-random"
@@ -66,33 +67,8 @@ const createOutcomeDraftFn = (
 	};
 };
 
-const appendOutcomeFn = (
-	value: OutcomeListValue,
-	kind: OutcomeDraftKind,
-	inventoryTemplateUid: string | undefined,
-): OutcomeListValue => [
-	...value,
-	createOutcomeDraftFn(kind, inventoryTemplateUid),
-];
-
-const duplicateOutcomeFn = (value: OutcomeListValue, index: number): OutcomeListValue => [
-	...value.slice(0, index + 1),
-	structuredClone(value[index]),
-	...value.slice(index + 1),
-];
-
-const removeOutcomeFn = (value: OutcomeListValue, index: number): OutcomeListValue =>
-	value.filter((_current, currentIndex) => currentIndex !== index);
-
-const replaceOutcomeFn = (
-	value: OutcomeListValue,
-	index: number,
-	next: OutcomeSchema.Type,
-): OutcomeListValue =>
-	value.map((current, currentIndex) => (currentIndex === index ? next : current));
-
 const readOutcomeAddOptionsFn = (
-	translator: ReturnType<typeof useTranslator>,
+	translator: createTranslatorFn.Translator,
 	onSelectFn: (kind: OutcomeDraftKind) => void,
 ): readonly ActionMenuOption[] => [
 	{
@@ -153,10 +129,10 @@ export const OutcomeList = ({
 	value,
 }: {
 	readonly initialOutcomeIndex?: number;
-	readonly onChangeFn: (outcomes: OutcomeListValue) => void;
+	readonly onChangeFn: (outcomes: OutcomeSchema.Type[]) => void;
 	readonly initialRuleIndex?: number;
 	readonly initialWhenIndex?: number;
-	readonly value: OutcomeListValue;
+	readonly value: OutcomeSchema.Type[];
 }) => {
 	const readItemLabelFn = useEditorItemOptionLabel();
 	const project = useEditorProject();
@@ -172,8 +148,13 @@ export const OutcomeList = ({
 			textFn: translator.textFn,
 		}),
 	);
+	const onEditFn = (edit: editEditorCollectionFn.Edit<OutcomeSchema.Type>) =>
+		onChangeFn(editEditorCollectionFn(value, edit));
 	const addOptions = readOutcomeAddOptionsFn(translator, (kind) =>
-		onChangeFn(appendOutcomeFn(value, kind, project.config.templates?.[0]?.uid)),
+		onEditFn({
+			type: "append",
+			value: createOutcomeDraftFn(kind, project.config.templates?.[0]?.uid),
+		}),
 	);
 	return (
 		<section className="grid gap-3">
@@ -220,8 +201,19 @@ export const OutcomeList = ({
 					/>
 				)}
 				addOptions={addOptions}
-				onDuplicateFn={(index) => onChangeFn(duplicateOutcomeFn(value, index))}
-				onRemoveFn={(index) => onChangeFn(removeOutcomeFn(value, index))}
+				onDuplicateFn={(index) =>
+					onEditFn({
+						type: "duplicate",
+						index,
+						copyFn: structuredClone,
+					})
+				}
+				onRemoveFn={(index) =>
+					onEditFn({
+						type: "remove",
+						index,
+					})
+				}
 				selectedIndex={invalidOutcomeIndex}
 			>
 				{(index) => (
@@ -233,7 +225,13 @@ export const OutcomeList = ({
 							index === initialOutcomeIndex ? initialWhenIndex : undefined
 						}
 						value={value[index]}
-						onChangeFn={(next) => onChangeFn(replaceOutcomeFn(value, index, next))}
+						onChangeFn={(next) =>
+							onEditFn({
+								type: "replace",
+								index,
+								value: next,
+							})
+						}
 					/>
 				)}
 			</EditorCollectionSelector>

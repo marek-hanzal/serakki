@@ -539,3 +539,49 @@ it("adds selected roll kinds with their own defaults", async () => {
 		container.remove();
 	}
 });
+
+it("removes the optional outcome table when its last set is deleted", async () => {
+	const value = OutcomeTableSchema.parse({
+		set: [
+			{
+				rules: [],
+				roll: [
+					{
+						type: "guaranteed",
+						outcome: [
+							{
+								type: "space",
+								space: 4,
+								rules: [],
+							},
+						],
+					},
+				],
+			},
+		],
+	});
+	const container = document.createElement("div");
+	document.body.append(container);
+	const root = createRoot(container);
+	const onChangeFn = vi.fn();
+	try {
+		await act(async () =>
+			root.render(
+				<OutcomeControl
+					value={value}
+					onChangeFn={onChangeFn}
+				/>,
+			),
+		);
+		const remove = container.querySelector<HTMLButtonElement>(
+			'[data-ui="EditorOutcomeSetsCollection"] [data-ui="EditorCollectionRemove"]',
+		);
+		if (remove === null) throw new Error("Missing outcome set removal control.");
+		await act(async () => remove.click());
+		expect(onChangeFn).toHaveBeenCalledExactlyOnceWith(undefined);
+		expect(value.set).toHaveLength(1);
+	} finally {
+		await act(async () => root.unmount());
+		container.remove();
+	}
+});

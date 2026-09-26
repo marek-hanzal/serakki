@@ -1,3 +1,5 @@
+import { editEditorCollectionFn } from "~/editor-control/fn/editEditorCollectionFn";
+import type { createTranslatorFn } from "~/translation/fn/createTranslatorFn";
 import { CircleCheck, Dice5 } from "lucide-react";
 
 import { useEditorItemOptionLabel } from "~/authoring-form/ui/useEditorItemSearchOptions";
@@ -25,30 +27,8 @@ const RollTypeLabelByType = {
 	guaranteed: "Guaranteed",
 } as const satisfies Record<RollSchema.Type["type"], string>;
 
-type RollListValue = RollSetSchema.Type["roll"];
-
-const appendRollFn = (value: RollListValue, type: RollSchema.Type["type"]): RollListValue => [
-	...value,
-	structuredClone(DraftDefaults.rolls[type]),
-];
-
-const duplicateRollFn = (value: RollListValue, index: number): RollListValue =>
-	[
-		...value.slice(0, index + 1),
-		structuredClone(value[index]),
-		...value.slice(index + 1),
-	] as RollListValue;
-
-const removeRollFn = (value: RollListValue, index: number): RollListValue =>
-	value.filter((_current, currentIndex) => currentIndex !== index) as RollListValue;
-
-const replaceRollFn = (value: RollListValue, index: number, next: RollSchema.Type): RollListValue =>
-	value.map((current, currentIndex) =>
-		currentIndex === index ? next : current,
-	) as RollListValue;
-
 const readRollAddOptionsFn = (
-	translator: ReturnType<typeof useTranslator>,
+	translator: createTranslatorFn.Translator,
 	onSelectFn: (type: RollSchema.Type["type"]) => void,
 ): readonly ActionMenuOption[] => [
 	{
@@ -97,10 +77,15 @@ export const RollList = ({
 			textFn: translator.textFn,
 		}),
 	);
-	const addOptions = readRollAddOptionsFn(translator, (type) =>
+	const onEditFn = (edit: editEditorCollectionFn.Edit<RollSchema.Type>) =>
 		onChangeFn({
 			...value,
-			roll: appendRollFn(value.roll, type),
+			roll: editEditorCollectionFn(value.roll, edit) as RollSetSchema.Type["roll"],
+		});
+	const addOptions = readRollAddOptionsFn(translator, (type) =>
+		onEditFn({
+			type: "append",
+			value: structuredClone(DraftDefaults.rolls[type]),
 		}),
 	);
 	return (
@@ -138,15 +123,16 @@ export const RollList = ({
 				label={`${translator.textFn("Outcome set")} ${index + 1} ${translator.textFn("rolls")}`}
 				addOptions={addOptions}
 				onDuplicateFn={(rollIndex) =>
-					onChangeFn({
-						...value,
-						roll: duplicateRollFn(value.roll, rollIndex),
+					onEditFn({
+						type: "duplicate",
+						index: rollIndex,
+						copyFn: structuredClone,
 					})
 				}
 				onRemoveFn={(rollIndex) =>
-					onChangeFn({
-						...value,
-						roll: removeRollFn(value.roll, rollIndex),
+					onEditFn({
+						type: "remove",
+						index: rollIndex,
 					})
 				}
 				selectedIndex={invalidRollIndex}
@@ -164,9 +150,10 @@ export const RollList = ({
 							rollIndex === initialRollIndex ? initialOutcomeIndex : undefined
 						}
 						onChangeFn={(next) =>
-							onChangeFn({
-								...value,
-								roll: replaceRollFn(value.roll, rollIndex, next),
+							onEditFn({
+								type: "replace",
+								index: rollIndex,
+								value: next,
 							})
 						}
 					/>
