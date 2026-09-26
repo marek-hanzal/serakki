@@ -1,3 +1,5 @@
+import { editEditorCollectionFn } from "~/editor-control/fn/editEditorCollectionFn";
+import type { RollSetSchema } from "~/outcome/schema/RollSetSchema";
 import { readOutcomeCollectionSummaryFn } from "~/production-authoring/fn/readOutcomeCollectionSummaryFn";
 import { useEditorProject } from "~/authoring-session/ui/useEditorProject";
 import { useFormSession } from "~/item-authoring/ui/FormContext";
@@ -15,6 +17,19 @@ import {
 import { readRequiredEditorCollectionErrorFn } from "~/editor-control/fn/readRequiredEditorCollectionErrorFn";
 import { useTranslator } from "~/translation/ui/useTranslator";
 
+/** Removing the last set removes the optional outcome table from its owner. */
+const editOutcomeSetsFn = (
+	value: OutcomeTableSchema.Type | undefined,
+	edit: editEditorCollectionFn.Edit<RollSetSchema.Type>,
+): OutcomeTableSchema.Type | undefined => {
+	const set = editEditorCollectionFn(value?.set ?? [], edit);
+	return set.length === 0
+		? undefined
+		: {
+				set: set as OutcomeTableSchema.Type["set"],
+			};
+};
+
 interface OutcomeControlProps {
 	readonly onChangeFn: (outcome: OutcomeTableSchema.Type | undefined) => void;
 	readonly value: OutcomeTableSchema.Type | undefined;
@@ -30,6 +45,8 @@ export const OutcomeControl = ({ onChangeFn, value }: OutcomeControlProps) => {
 	const validationIssues = useFormValidationIssues(value);
 	const sets = value?.set ?? [];
 	const invalidSetIndex = useFormValidationFocusIndex(value, "set");
+	const onEditFn = (edit: editEditorCollectionFn.Edit<RollSetSchema.Type>) =>
+		onChangeFn(editOutcomeSetsFn(value, edit));
 	return (
 		<section className="grid gap-3">
 			<EditorCollectionSelector
@@ -70,30 +87,23 @@ export const OutcomeControl = ({ onChangeFn, value }: OutcomeControlProps) => {
 				)}
 				label={translator.textFn("Outcome sets")}
 				onAddFn={() =>
-					onChangeFn({
-						set: [
-							...sets,
-							structuredClone(DraftDefaults.outcome.set[0]),
-						] as OutcomeTableSchema.Type["set"],
+					onEditFn({
+						type: "append",
+						value: structuredClone(DraftDefaults.outcome.set[0]),
 					})
 				}
 				onDuplicateFn={(index) =>
-					onChangeFn({
-						set: [
-							...sets.slice(0, index + 1),
-							structuredClone(sets[index]),
-							...sets.slice(index + 1),
-						] as OutcomeTableSchema.Type["set"],
+					onEditFn({
+						type: "duplicate",
+						index,
+						copyFn: structuredClone,
 					})
 				}
 				onRemoveFn={(index) =>
-					sets.length === 1
-						? onChangeFn(undefined)
-						: onChangeFn({
-								set: sets.filter(
-									(_current, currentIndex) => currentIndex !== index,
-								) as OutcomeTableSchema.Type["set"],
-							})
+					onEditFn({
+						type: "remove",
+						index,
+					})
 				}
 				selectedIndex={invalidSetIndex}
 			>
@@ -113,10 +123,10 @@ export const OutcomeControl = ({ onChangeFn, value }: OutcomeControlProps) => {
 							}
 							value={set}
 							onChangeFn={(next) =>
-								onChangeFn({
-									set: sets.map((current, currentIndex) =>
-										currentIndex === index ? next : current,
-									) as OutcomeTableSchema.Type["set"],
+								onEditFn({
+									type: "replace",
+									index,
+									value: next,
 								})
 							}
 						/>

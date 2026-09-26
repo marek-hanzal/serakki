@@ -1,10 +1,12 @@
-import { readSpaceDestinationLabelFn } from "~/space/fn/readSpaceDestinationLabelFn";
 import { PanelsTopLeft } from "lucide-react";
-import { useTranslator } from "~/translation/ui/useTranslator";
-import type { OutcomeSchema } from "~/outcome/schema/OutcomeSchema";
-import { EditorCollectionOption } from "~/editor-control/ui/EditorCollectionOption";
+
+import { useEditorItemOptionLabel } from "~/authoring-form/ui/useEditorItemSearchOptions";
 import { EditorItemThumbnail } from "~/authoring-form/ui/EditorItemThumbnail";
 import { useEditorProject } from "~/authoring-session/ui/useEditorProject";
+import { EditorCollectionOption } from "~/editor-control/ui/EditorCollectionOption";
+import type { OutcomeSchema } from "~/outcome/schema/OutcomeSchema";
+import { readOutcomePresentationFn } from "~/production-authoring/fn/readOutcomePresentationFn";
+import { useTranslator } from "~/translation/ui/useTranslator";
 
 /** Lists possible emitted identities, not condition references or guaranteed runtime outcomes. */
 export const OutcomeOption = ({
@@ -18,9 +20,19 @@ export const OutcomeOption = ({
 }) => {
 	const project = useEditorProject();
 	const translator = useTranslator();
-	const ids = [
+	const readItemLabelFn = useEditorItemOptionLabel();
+	const entries = outcomes.map((outcome) => ({
+		outcome,
+		presentation: readOutcomePresentationFn({
+			outcome,
+			templates: project.config.templates,
+			readItemLabelFn,
+			textFn: translator.textFn,
+		}),
+	}));
+	const itemUids = [
 		...new Set(
-			outcomes.flatMap((outcome) =>
+			entries.flatMap(({ outcome }) =>
 				outcome.type === "item"
 					? [
 							outcome.itemUid,
@@ -38,7 +50,7 @@ export const OutcomeOption = ({
 				)
 			}
 		>
-			{ids.map((id) => (
+			{itemUids.map((id) => (
 				<EditorItemThumbnail
 					key={id}
 					size="md"
@@ -50,37 +62,25 @@ export const OutcomeOption = ({
 					}
 				/>
 			))}
-			{outcomes
-				.filter((outcome) => outcome.type === "space")
-				.map((outcome, index) => (
+			{entries
+				.filter(({ outcome }) => outcome.type === "space")
+				.map(({ presentation }, index) => (
 					<span
 						key={`space:${index}`}
 						className="text-xs"
 					>
-						{readSpaceDestinationLabelFn(
-							outcome.space,
-							translator.textFn,
-							project.config.templates,
-						)}
+						{presentation.label}
 					</span>
 				))}
-			{outcomes
-				.filter((outcome) => outcome.type === "template")
-				.map((outcome, index) => (
+			{entries
+				.filter(({ outcome }) => outcome.type === "template")
+				.map(({ presentation }, index) => (
 					<span
 						key={`template:${index}`}
 						className="flex items-center gap-1 text-xs"
 					>
 						<PanelsTopLeft className="size-4" />
-						{project.config.templates?.find(
-							(template) => template.uid === outcome.templateUid,
-						)?.title ?? translator.textFn("No template selected")}
-						{outcome.space === undefined ? null : (
-							<>
-								{" · "}
-								{translator.textFn("Space")} {outcome.space}
-							</>
-						)}
+						{presentation.label}
 					</span>
 				))}
 		</EditorCollectionOption>

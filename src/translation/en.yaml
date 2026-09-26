@@ -916,6 +916,12 @@ Make this recipe when you click the item on the board.:
   value: Make this recipe when you click the item on the board.
 Managed:
   value: Managed
+Match a range of selected item counts.:
+  value: Match a range of selected item counts.
+Match an exact number of selected items.:
+  value: Match an exact number of selected items.
+Match when the selected item exists in the search area.:
+  value: Match when the selected item exists in the search area.
 Matches any positive board distance and excludes only Self.:
   value: Matches anything else on the current Board. This item is excluded.
   dynamic: true
