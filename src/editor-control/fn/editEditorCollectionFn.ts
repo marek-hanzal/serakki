@@ -1,3 +1,5 @@
+import { match } from "ts-pattern";
+
 export namespace editEditorCollectionFn {
 	export type Edit<Value> =
 		| {
@@ -28,27 +30,45 @@ export namespace editEditorCollectionFn {
 export const editEditorCollectionFn = <Value>(
 	values: readonly Value[],
 	edit: editEditorCollectionFn.Edit<NoInfer<Value>>,
-): Value[] => {
-	switch (edit.type) {
-		case "append":
-			return [
+): Value[] =>
+	match(edit)
+		.returnType<Value[]>()
+		.with(
+			{
+				type: "append",
+			},
+			({ value }) => [
 				...values,
-				edit.value,
-			];
-		case "duplicate":
-			return values.flatMap((value, index) =>
-				index === edit.index
-					? [
-							value,
-							edit.copyFn(value),
-						]
-					: [
-							value,
-						],
-			);
-		case "replace":
-			return values.map((value, index) => (index === edit.index ? edit.value : value));
-		case "remove":
-			return values.filter((_value, index) => index !== edit.index);
-	}
-};
+				value,
+			],
+		)
+		.with(
+			{
+				type: "duplicate",
+			},
+			({ index: selectedIndex, copyFn }) =>
+				values.flatMap((value, index) =>
+					index === selectedIndex
+						? [
+								value,
+								copyFn(value),
+							]
+						: [
+								value,
+							],
+				),
+		)
+		.with(
+			{
+				type: "replace",
+			},
+			({ index: selectedIndex, value: next }) =>
+				values.map((value, index) => (index === selectedIndex ? next : value)),
+		)
+		.with(
+			{
+				type: "remove",
+			},
+			({ index: selectedIndex }) => values.filter((_value, index) => index !== selectedIndex),
+		)
+		.exhaustive();

@@ -1,3 +1,5 @@
+import { match } from "ts-pattern";
+
 import { editEditorCollectionFn } from "~/editor-control/fn/editEditorCollectionFn";
 import type { createTranslatorFn } from "~/translation/fn/createTranslatorFn";
 import { DoorOpen, History, MapPin, PanelsTopLeft, Shuffle, Sparkles } from "lucide-react";
@@ -32,40 +34,38 @@ type OutcomeDraftKind =
 const createOutcomeDraftFn = (
 	kind: OutcomeDraftKind,
 	inventoryTemplateUid: string | undefined,
-): OutcomeSchema.Type => {
-	if (kind === "drop-local") return structuredClone(DraftDefaults.itemOutcome);
-	if (kind === "drop-random")
-		return {
+): OutcomeSchema.Type =>
+	match(kind)
+		.returnType<OutcomeSchema.Type>()
+		.with("drop-local", () => structuredClone(DraftDefaults.itemOutcome))
+		.with("drop-random", () => ({
 			...structuredClone(DraftDefaults.itemOutcome),
 			placement: "random",
-		};
-	if (kind === "space")
-		return {
+		}))
+		.with("space", () => ({
 			type: "space",
 			space: 0,
 			rules: [],
-		};
-	if (kind === "space-previous")
-		return {
+		}))
+		.with("space-previous", () => ({
 			type: "space",
 			space: "previous",
 			rules: [],
-		};
-	if (kind === "space-inventory")
-		return {
+		}))
+		.with("space-inventory", () => ({
 			type: "space",
 			space: {
 				type: "inventory",
 				templateUid: inventoryTemplateUid ?? "",
 			},
 			rules: [],
-		};
-	return {
-		type: "template",
-		templateUid: "",
-		rules: [],
-	};
-};
+		}))
+		.with("template", () => ({
+			type: "template",
+			templateUid: "",
+			rules: [],
+		}))
+		.exhaustive();
 
 const readOutcomeAddOptionsFn = (
 	translator: createTranslatorFn.Translator,
